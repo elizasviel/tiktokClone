@@ -1,5 +1,6 @@
 import SwiftUI
 import AVKit
+import FirebaseAuth
 
 struct VideoFeedView: View {
     @StateObject private var videoService = VideoService.shared
@@ -30,9 +31,12 @@ struct VideoFeedView: View {
 
 struct FullScreenVideoPlayer: View {
     let video: Video
+    @StateObject private var videoService = VideoService.shared
     @State private var player: AVPlayer?
     @State private var isPlaying = true
     @State private var showControls = false
+    @State private var showComments = false
+    @State private var isLiked = false
     
     var body: some View {
         ZStack {
@@ -59,20 +63,30 @@ struct FullScreenVideoPlayer: View {
                     Spacer()
                     
                     VStack(spacing: 20) {
-                        Button(action: { /* Like action */ }) {
+                        Button(action: {
+                            Task {
+                                if isLiked {
+                                    try? await videoService.unlikeVideo(video.id)
+                                } else {
+                                    try? await videoService.likeVideo(video.id)
+                                }
+                                isLiked.toggle()
+                            }
+                        }) {
                             VStack {
-                                Image(systemName: "heart.fill")
+                                Image(systemName: isLiked ? "heart.fill" : "heart")
                                     .font(.title)
-                                Text("Like")
+                                    .foregroundColor(isLiked ? .red : .white)
+                                Text("\(videoService.likes[video.id]?.count ?? 0)")
                                     .font(.caption)
                             }
                         }
                         
-                        Button(action: { /* Comment action */ }) {
+                        Button(action: { showComments = true }) {
                             VStack {
                                 Image(systemName: "message.fill")
                                     .font(.title)
-                                Text("Comment")
+                                Text("\(videoService.comments[video.id]?.count ?? 0)")
                                     .font(.caption)
                             }
                         }
@@ -101,6 +115,17 @@ struct FullScreenVideoPlayer: View {
         .onDisappear {
             player?.pause()
             player = nil
+        }
+        .sheet(isPresented: $showComments) {
+            CommentsView(videoId: video.id)
+        }
+        .task {
+            do {
+                try await videoService.fetchLikesAndComments(for: video.id)
+                isLiked = videoService.likes[video.id]?.contains { $0.userId == Auth.auth().currentUser?.uid } ?? false
+            } catch {
+                print("Error fetching likes and comments: \(error)")
+            }
         }
     }
 }
