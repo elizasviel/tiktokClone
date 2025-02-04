@@ -16,13 +16,31 @@ struct ContentView: View {
                 TabView {
                     VideoFeedView()
                         .tabItem {
-                            Image(systemName: "play.circle")
-                            Text("Feed")
+                            Image(systemName: "house.fill")
+                            Text("Home")
+                        }
+                    
+                    Text("Discover")
+                        .tabItem {
+                            Image(systemName: "magnifyingglass")
+                            Text("Discover")
+                        }
+                    
+                    VideoUploadView()
+                        .tabItem {
+                            Image(systemName: "plus.square")
+                            Text("Create")
+                        }
+                    
+                    Text("Inbox")
+                        .tabItem {
+                            Image(systemName: "message.fill")
+                            Text("Inbox")
                         }
                     
                     ProfileView()
                         .tabItem {
-                            Image(systemName: "person")
+                            Image(systemName: "person.fill")
                             Text("Profile")
                         }
                 }
