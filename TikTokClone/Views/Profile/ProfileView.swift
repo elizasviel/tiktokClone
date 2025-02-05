@@ -24,69 +24,88 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 12) {
-                    // Profile Header - More compact layout
-                    HStack(alignment: .center, spacing: 16) {
-                        // Profile Image
-                        Button(action: { showImagePicker = true }) {
+                VStack(spacing: 20) {
+                    // Profile Header
+                    VStack(spacing: 15) {
+                        // Profile Image with Edit Button
+                        ZStack(alignment: .bottomTrailing) {
                             ProfileImageView(imageUrl: currentUser?.profileImageUrl)
-                                .frame(width: 80, height: 80)
+                                .frame(width: 100, height: 100)
+                            
+                            Button(action: { showImagePicker = true }) {
+                                Image(systemName: "pencil.circle.fill")
+                                    .font(.title)
+                                    .foregroundColor(.blue)
+                                    .background(Color.white)
+                                    .clipShape(Circle())
+                            }
+                            .offset(x: 5, y: 5)
                         }
                         
-                        // Stats beside the profile image
-                        HStack(spacing: 20) {
+                        // Username and Email
+                        VStack(spacing: 4) {
+                            Text("@\(currentUser?.username ?? "user")")
+                                .font(.title2)
+                                .fontWeight(.bold)
+                            Text(currentUser?.email ?? "")
+                                .font(.subheadline)
+                                .foregroundColor(.gray)
+                        }
+                        
+                        // Stats Row
+                        HStack(spacing: 40) {
                             StatView(value: userVideos.count, title: "Posts")
                             StatView(value: 0, title: "Followers")
                             StatView(value: 0, title: "Following")
                         }
-                    }
-                    .padding(.horizontal)
-                    
-                    // User Info - More compact
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text("@\(currentUser?.username ?? "user")")
-                            .font(.headline)
-                        Text(currentUser?.email ?? "")
-                            .font(.subheadline)
-                            .foregroundColor(.gray)
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .padding(.horizontal)
-                    
-                    // Action Buttons Row
-                    HStack(spacing: 8) {
-                        Button(action: { showEditProfile = true }) {
-                            Text("Edit Profile")
-                                .font(.system(size: 14, weight: .medium))
+                        .padding(.vertical, 10)
+                        
+                        // Action Buttons
+                        HStack(spacing: 12) {
+                            Button(action: { showEditProfile = true }) {
+                                HStack {
+                                    Image(systemName: "pencil")
+                                    Text("Edit Profile")
+                                }
+                                .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(.primary)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
-                                .background(Color.gray.opacity(0.1))
-                                .cornerRadius(6)
-                        }
-                        
-                        Button(action: { authService.signOut() }) {
-                            Text("Sign Out")
-                                .font(.system(size: 14, weight: .medium))
+                                .padding(.vertical, 8)
+                                .background(Color(.systemGray6))
+                                .cornerRadius(8)
+                            }
+                            
+                            Button(action: { authService.signOut() }) {
+                                HStack {
+                                    Image(systemName: "rectangle.portrait.and.arrow.right")
+                                    Text("Sign Out")
+                                }
+                                .font(.system(size: 14, weight: .semibold))
                                 .foregroundColor(.red)
                                 .frame(maxWidth: .infinity)
-                                .padding(.vertical, 6)
+                                .padding(.vertical, 8)
                                 .background(Color.red.opacity(0.1))
-                                .cornerRadius(6)
+                                .cornerRadius(8)
+                            }
                         }
+                        .padding(.horizontal)
                     }
-                    .padding(.horizontal)
+                    .padding(.top)
                     
-                    // Content Tabs - Simplified
-                    HStack {
-                        TabButton(title: "Videos", isSelected: selectedTab == 0) {
-                            withAnimation { selectedTab = 0 }
+                    // Content Tabs
+                    VStack(spacing: 0) {
+                        HStack {
+                            TabButton(title: "Videos", icon: "play.square.fill", isSelected: selectedTab == 0) {
+                                withAnimation { selectedTab = 0 }
+                            }
+                            TabButton(title: "Liked", icon: "heart.fill", isSelected: selectedTab == 1) {
+                                withAnimation { selectedTab = 1 }
+                            }
                         }
-                        TabButton(title: "Liked", isSelected: selectedTab == 1) {
-                            withAnimation { selectedTab = 1 }
-                        }
+                        .padding(.horizontal)
+                        
+                        Divider()
                     }
-                    .padding(.horizontal, 8)
                     
                     // Content View
                     TabView(selection: $selectedTab) {
@@ -103,9 +122,13 @@ struct ProfileView: View {
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .navigationBarTrailing) {
-                    Button(action: { showDeleteConfirmation = true }) {
-                        Image(systemName: "trash")
-                            .foregroundColor(.red)
+                    Menu {
+                        Button(role: .destructive, action: { showDeleteConfirmation = true }) {
+                            Label("Delete Account", systemImage: "trash")
+                        }
+                    } label: {
+                        Image(systemName: "ellipsis")
+                            .foregroundColor(.primary)
                     }
                 }
             }
@@ -154,11 +177,15 @@ struct ProfileView: View {
             let _ = try await storageRef.putDataAsync(imageData)
             let url = try await storageRef.downloadURL()
             
-            // Update user profile in Firestore
-            try await Firestore.firestore()
-                .collection("users")
-                .document(uid)
-                .updateData(["profileImageUrl": url.absoluteString])
+            // Update user profile in Firestore - Fix for Swift 6 data race
+            await MainActor.run {
+                Task {
+                    try await Firestore.firestore()
+                        .collection("users")
+                        .document(uid)
+                        .updateData(["profileImageUrl": url.absoluteString])
+                }
+            }
             
             // Update local user data
             if var updatedUser = authService.currentUser {
@@ -228,11 +255,11 @@ struct StatView: View {
     let title: String
     
     var body: some View {
-        VStack(spacing: 2) {
+        VStack(spacing: 4) {
             Text("\(value)")
-                .font(.system(size: 16, weight: .bold))
+                .font(.system(size: 20, weight: .bold))
             Text(title)
-                .font(.system(size: 12))
+                .font(.system(size: 13))
                 .foregroundColor(.gray)
         }
     }
@@ -240,15 +267,20 @@ struct StatView: View {
 
 struct TabButton: View {
     let title: String
+    let icon: String
     let isSelected: Bool
     let action: () -> Void
     
     var body: some View {
         Button(action: action) {
             VStack(spacing: 8) {
-                Text(title)
-                    .fontWeight(isSelected ? .bold : .regular)
-                    .foregroundColor(isSelected ? .primary : .gray)
+                HStack(spacing: 6) {
+                    Image(systemName: icon)
+                        .font(.system(size: 16))
+                    Text(title)
+                }
+                .fontWeight(isSelected ? .bold : .regular)
+                .foregroundColor(isSelected ? .primary : .gray)
                 
                 Rectangle()
                     .fill(isSelected ? Color.blue : Color.clear)
@@ -261,7 +293,7 @@ struct TabButton: View {
 
 struct VideosGridView: View {
     let videos: [Video]
-    let columns = Array(repeating: GridItem(.flexible(), spacing: 1), count: 3)
+    let columns = Array(repeating: GridItem(.flexible(), spacing: 2), count: 3)
     
     var body: some View {
         if videos.isEmpty {
@@ -269,14 +301,18 @@ struct VideosGridView: View {
                 .foregroundColor(.gray)
                 .padding()
         } else {
-            LazyVGrid(columns: columns, spacing: 1) {
-                ForEach(videos) { video in
-                    NavigationLink(destination: VideoFeedView()) {
-                        VideoThumbnail(video: video)
-                            .frame(height: UIScreen.main.bounds.width / 3)
-                            .clipped()
+            ScrollView {
+                LazyVGrid(columns: columns, spacing: 2) {
+                    ForEach(videos) { video in
+                        NavigationLink(destination: VideoFeedView()) {
+                            VideoThumbnail(video: video)
+                                .aspectRatio(9/16, contentMode: .fill)
+                                .frame(height: UIScreen.main.bounds.width / 3)
+                                .clipped()
+                        }
                     }
                 }
+                .padding(2)
             }
         }
     }
@@ -296,11 +332,17 @@ struct VideoThumbnail: View {
                 image
                     .resizable()
                     .aspectRatio(contentMode: .fill)
+                    .overlay(
+                        Image(systemName: "play.fill")
+                            .foregroundColor(.white)
+                            .shadow(radius: 2)
+                            .font(.title3)
+                    )
             case .failure:
                 Rectangle()
                     .fill(Color.gray.opacity(0.3))
                     .overlay(
-                        Image(systemName: "play.fill")
+                        Image(systemName: "play.slash.fill")
                             .foregroundColor(.white)
                     )
             @unknown default:
@@ -308,6 +350,8 @@ struct VideoThumbnail: View {
                     .fill(Color.gray.opacity(0.3))
             }
         }
+        .background(Color.black)
+        .cornerRadius(4)
     }
 }
 
@@ -337,11 +381,11 @@ struct CustomTabView: View {
     var body: some View {
         VStack {
             HStack {
-                TabButton(title: "Videos", isSelected: selectedTab == 0) {
+                TabButton(title: "Videos", icon: "play.square.fill", isSelected: selectedTab == 0) {
                     withAnimation { selectedTab = 0 }
                 }
                 
-                TabButton(title: "Liked", isSelected: selectedTab == 1) {
+                TabButton(title: "Liked", icon: "heart.fill", isSelected: selectedTab == 1) {
                     withAnimation { selectedTab = 1 }
                 }
             }
