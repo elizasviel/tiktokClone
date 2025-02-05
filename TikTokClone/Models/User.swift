@@ -7,12 +7,14 @@ struct User: Identifiable {
     let username: String
     let email: String
     let dateJoined: Timestamp
+    let profileImageUrl: String?
     
-    init(id: String, username: String, email: String, dateJoined: Timestamp) {
+    init(id: String, username: String, email: String, dateJoined: Timestamp, profileImageUrl: String? = nil) {
         self.id = id
         self.username = username
         self.email = email
         self.dateJoined = dateJoined
+        self.profileImageUrl = profileImageUrl
     }
     
     init?(from dict: [String: Any]) {
@@ -27,14 +29,21 @@ struct User: Identifiable {
         self.username = username
         self.email = email
         self.dateJoined = dateJoined
+        self.profileImageUrl = dict["profileImageUrl"] as? String
     }
     
     func toDictionary() -> [String: Any] {
-        return [
+        var dict = [
             "id": id,
             "username": username,
             "email": email,
             "dateJoined": dateJoined
-        ]
+        ] as [String: Any]
+        
+        if let profileImageUrl = profileImageUrl {
+            dict["profileImageUrl"] = profileImageUrl
+        }
+        
+        return dict
     }
 } 

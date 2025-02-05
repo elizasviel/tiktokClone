@@ -4,11 +4,36 @@ import FirebaseAuth
 
 class AuthService: ObservableObject {
     @Published var userSession: FirebaseAuth.User?
+    @Published var currentUser: User?
     
     static let shared = AuthService()
     
     init() {
         self.userSession = Auth.auth().currentUser
+        
+        // Fetch current user data if logged in
+        if let uid = userSession?.uid {
+            Task {
+                await fetchCurrentUser(uid: uid)
+            }
+        }
+    }
+    
+    private func fetchCurrentUser(uid: String) async {
+        do {
+            let snapshot = try await Firestore.firestore()
+                .collection("users")
+                .document(uid)
+                .getDocument()
+            
+            if let userData = snapshot.data() {
+                await MainActor.run {
+                    self.currentUser = User(from: userData)
+                }
+            }
+        } catch {
+            print("DEBUG: Error fetching current user: \(error.localizedDescription)")
+        }
     }
     
     func createUser(email: String, password: String, username: String) async throws {
@@ -34,7 +59,10 @@ class AuthService: ObservableObject {
     func signIn(withEmail email: String, password: String) async throws {
         do {
             let result = try await Auth.auth().signIn(withEmail: email, password: password)
-            self.userSession = result.user
+            await MainActor.run {
+                self.userSession = result.user
+            }
+            await fetchCurrentUser(uid: result.user.uid)
         } catch {
             print("DEBUG: Failed to sign in with error: \(error.localizedDescription)")
             throw error
@@ -45,6 +73,7 @@ class AuthService: ObservableObject {
         do {
             try Auth.auth().signOut()
             self.userSession = nil
+            self.currentUser = nil
         } catch {
             print("DEBUG: Failed to sign out with error: \(error.localizedDescription)")
         }
