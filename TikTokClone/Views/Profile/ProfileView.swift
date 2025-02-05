@@ -167,26 +167,33 @@ struct ProfileView: View {
     
     private func uploadProfileImage(_ image: UIImage) async {
         isLoading = true
-        defer { isLoading = false }
-        
-        guard let imageData = image.jpegData(compressionQuality: 0.8),
-              let uid = authService.userSession?.uid else { return }
         
         do {
-            // Upload image to Firebase Storage
-            let storageRef = Storage.storage().reference().child("profile_images/\(uid).jpg")
-            let _ = try await storageRef.putDataAsync(imageData)
-            let url = try await storageRef.downloadURL()
-            
-            // Update user profile in Firestore - Fix for Swift 6 data race
-            await MainActor.run {
-                Task {
-                    try await Firestore.firestore()
-                        .collection("users")
-                        .document(uid)
-                        .updateData(["profileImageUrl": url.absoluteString])
-                }
+            guard let imageData = image.jpegData(compressionQuality: 0.5),
+                  let uid = Auth.auth().currentUser?.uid else {
+                throw NSError(domain: "", code: -1, userInfo: [NSLocalizedDescriptionKey: "Invalid user or image data"])
             }
+            
+            // Create storage reference
+            let storageRef = Storage.storage().reference()
+                .child("profile_images")
+                .child("\(uid).jpg")
+            
+            // Upload image data
+            let metadata = StorageMetadata()
+            metadata.contentType = "image/jpeg"
+            
+            // Perform the upload
+            _ = try await storageRef.putData(imageData, metadata: metadata)
+            
+            // Get download URL
+            let downloadURL = try await storageRef.downloadURL()
+            
+            // Update Firestore document
+            try await Firestore.firestore()
+                .collection("users")
+                .document(uid)
+                .updateData(["profileImageUrl": downloadURL.absoluteString])
             
             // Update local user data
             if var updatedUser = authService.currentUser {
@@ -195,13 +202,20 @@ struct ProfileView: View {
                     username: updatedUser.username,
                     email: updatedUser.email,
                     dateJoined: updatedUser.dateJoined,
-                    profileImageUrl: url.absoluteString
+                    profileImageUrl: downloadURL.absoluteString
                 )
+                
                 await MainActor.run {
                     authService.currentUser = updatedUser
+                    isLoading = false
                 }
             }
+            
+            print("DEBUG: Successfully uploaded profile image")
         } catch {
+            await MainActor.run {
+                isLoading = false
+            }
             print("DEBUG: Failed to upload profile image with error: \(error.localizedDescription)")
         }
     }
