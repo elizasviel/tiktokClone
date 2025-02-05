@@ -24,117 +24,91 @@ struct ProfileView: View {
     var body: some View {
         NavigationStack {
             ScrollView {
-                VStack(spacing: 20) {
-                    // Profile Header
-                    VStack(spacing: 16) {
-                        // Profile Image with edit button
-                        ZStack(alignment: .bottomTrailing) {
-                            Button(action: { showImagePicker = true }) {
-                                if let profileImageUrl = currentUser?.profileImageUrl,
-                                   let url = URL(string: profileImageUrl) {
-                                    KFImage(url)
-                                        .resizable()
-                                        .placeholder {
-                                            Circle()
-                                                .fill(Color.gray.opacity(0.2))
-                                                .overlay(
-                                                    Image(systemName: "person.fill")
-                                                        .font(.system(size: 40))
-                                                        .foregroundColor(.gray)
-                                                )
-                                        }
-                                        .aspectRatio(contentMode: .fill)
-                                        .frame(width: 100, height: 100)
-                                        .clipShape(Circle())
-                                        .overlay(
-                                            Circle()
-                                                .stroke(Color.white, lineWidth: 3)
-                                        )
-                                        .shadow(radius: 3)
-                                } else {
-                                    Circle()
-                                        .fill(Color.gray.opacity(0.2))
-                                        .frame(width: 100, height: 100)
-                                        .overlay(
-                                            Image(systemName: "person.fill")
-                                                .font(.system(size: 40))
-                                                .foregroundColor(.gray)
-                                        )
-                                        .overlay(
-                                            Circle()
-                                                .stroke(Color.white, lineWidth: 3)
-                                        )
-                                        .shadow(radius: 3)
-                                }
-                            }
-                            
-                            Image(systemName: "camera.circle.fill")
-                                .font(.title)
-                                .foregroundColor(.blue)
-                                .background(Color.white)
-                                .clipShape(Circle())
+                VStack(spacing: 12) {
+                    // Profile Header - More compact layout
+                    HStack(alignment: .center, spacing: 16) {
+                        // Profile Image
+                        Button(action: { showImagePicker = true }) {
+                            ProfileImageView(imageUrl: currentUser?.profileImageUrl)
+                                .frame(width: 80, height: 80)
                         }
                         
-                        // User Info with Shimmer Effect
-                        VStack(spacing: 4) {
-                            if isLoading {
-                                ShimmerView()
-                                    .frame(width: 150, height: 24)
-                            } else {
-                                Text("@\(currentUser?.username ?? "user")")
-                                    .font(.title2)
-                                    .fontWeight(.bold)
-                            }
-                            
-                            Text(currentUser?.email ?? "")
-                                .font(.subheadline)
-                                .foregroundColor(.gray)
-                            
-                            Text("Member since \(formatDate(currentUser?.dateJoined.dateValue() ?? Date()))")
-                                .font(.caption)
-                                .foregroundColor(.gray)
+                        // Stats beside the profile image
+                        HStack(spacing: 20) {
+                            StatView(value: userVideos.count, title: "Posts")
+                            StatView(value: 0, title: "Followers")
+                            StatView(value: 0, title: "Following")
                         }
-                        
-                        // Enhanced Stats Row
-                        HStack(spacing: 40) {
-                            StatView(value: userVideos.count, title: "Posts", icon: "video.fill")
-                            StatView(value: 0, title: "Followers", icon: "person.2.fill")
-                            StatView(value: 0, title: "Following", icon: "person.3.fill")
-                        }
-                        .padding(.vertical)
-                    }
-                    .padding()
-                    
-                    // Edit Profile Button
-                    Button(action: { showEditProfile = true }) {
-                        Text("Edit Profile")
-                            .font(.system(size: 16, weight: .semibold))
-                            .foregroundColor(.primary)
-                            .frame(maxWidth: .infinity)
-                            .padding(.vertical, 8)
-                            .background(Color.gray.opacity(0.1))
-                            .cornerRadius(8)
                     }
                     .padding(.horizontal)
                     
-                    // Enhanced Content Tabs
-                    CustomTabView(selectedTab: $selectedTab, userVideos: userVideos)
+                    // User Info - More compact
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("@\(currentUser?.username ?? "user")")
+                            .font(.headline)
+                        Text(currentUser?.email ?? "")
+                            .font(.subheadline)
+                            .foregroundColor(.gray)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding(.horizontal)
                     
-                    // Action Buttons
-                    VStack(spacing: 12) {
-                        ActionButton(title: "Sign Out", icon: "rectangle.portrait.and.arrow.right", color: .blue) {
-                            authService.signOut()
+                    // Action Buttons Row
+                    HStack(spacing: 8) {
+                        Button(action: { showEditProfile = true }) {
+                            Text("Edit Profile")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.primary)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(Color.gray.opacity(0.1))
+                                .cornerRadius(6)
                         }
                         
-                        ActionButton(title: "Delete Account", icon: "trash", color: .red) {
-                            showDeleteConfirmation = true
+                        Button(action: { authService.signOut() }) {
+                            Text("Sign Out")
+                                .font(.system(size: 14, weight: .medium))
+                                .foregroundColor(.red)
+                                .frame(maxWidth: .infinity)
+                                .padding(.vertical, 6)
+                                .background(Color.red.opacity(0.1))
+                                .cornerRadius(6)
                         }
                     }
-                    .padding()
+                    .padding(.horizontal)
+                    
+                    // Content Tabs - Simplified
+                    HStack {
+                        TabButton(title: "Videos", isSelected: selectedTab == 0) {
+                            withAnimation { selectedTab = 0 }
+                        }
+                        TabButton(title: "Liked", isSelected: selectedTab == 1) {
+                            withAnimation { selectedTab = 1 }
+                        }
+                    }
+                    .padding(.horizontal, 8)
+                    
+                    // Content View
+                    TabView(selection: $selectedTab) {
+                        VideosGridView(videos: userVideos)
+                            .tag(0)
+                        LikedVideosView()
+                            .tag(1)
+                    }
+                    .tabViewStyle(.page(indexDisplayMode: .never))
+                    .frame(height: UIScreen.main.bounds.height * 0.6)
                 }
             }
             .navigationTitle("Profile")
             .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .navigationBarTrailing) {
+                    Button(action: { showDeleteConfirmation = true }) {
+                        Image(systemName: "trash")
+                            .foregroundColor(.red)
+                    }
+                }
+            }
             .refreshable {
                 await fetchUserVideos()
             }
@@ -216,21 +190,49 @@ struct ProfileView: View {
     }
 }
 
-// Supporting Views
+// Updated Supporting Views
+struct ProfileImageView: View {
+    let imageUrl: String?
+    
+    var body: some View {
+        if let imageUrl = imageUrl,
+           let url = URL(string: imageUrl) {
+            KFImage(url)
+                .resizable()
+                .placeholder {
+                    Circle()
+                        .fill(Color.gray.opacity(0.2))
+                        .overlay(
+                            Image(systemName: "person.fill")
+                                .font(.system(size: 30))
+                                .foregroundColor(.gray)
+                        )
+                }
+                .aspectRatio(contentMode: .fill)
+                .clipShape(Circle())
+                .overlay(Circle().stroke(Color.white, lineWidth: 2))
+        } else {
+            Circle()
+                .fill(Color.gray.opacity(0.2))
+                .overlay(
+                    Image(systemName: "person.fill")
+                        .font(.system(size: 30))
+                        .foregroundColor(.gray)
+                )
+        }
+    }
+}
+
 struct StatView: View {
     let value: Int
     let title: String
-    let icon: String
     
     var body: some View {
-        VStack(spacing: 4) {
-            Image(systemName: icon)
-                .font(.system(size: 20))
+        VStack(spacing: 2) {
             Text("\(value)")
-                .font(.headline)
-                .fontWeight(.bold)
+                .font(.system(size: 16, weight: .bold))
             Text(title)
-                .font(.subheadline)
+                .font(.system(size: 12))
                 .foregroundColor(.gray)
         }
     }
@@ -269,32 +271,13 @@ struct VideosGridView: View {
         } else {
             LazyVGrid(columns: columns, spacing: 1) {
                 ForEach(videos) { video in
-                    VideoThumbnail(video: video)
-                        .frame(height: UIScreen.main.bounds.width / 3)
+                    NavigationLink(destination: VideoFeedView()) {
+                        VideoThumbnail(video: video)
+                            .frame(height: UIScreen.main.bounds.width / 3)
+                            .clipped()
+                    }
                 }
             }
-        }
-    }
-}
-
-struct ActionButton: View {
-    let title: String
-    let icon: String
-    let color: Color
-    let action: () -> Void
-    
-    var body: some View {
-        Button(action: action) {
-            HStack {
-                Image(systemName: icon)
-                Text(title)
-                    .fontWeight(.semibold)
-            }
-            .foregroundColor(.white)
-            .frame(maxWidth: .infinity)
-            .padding()
-            .background(color)
-            .cornerRadius(10)
         }
     }
 }
@@ -303,28 +286,28 @@ struct VideoThumbnail: View {
     let video: Video
     
     var body: some View {
-        ZStack {
-            if let thumbnailUrl = video.thumbnailUrl,
-               let url = URL(string: thumbnailUrl) {
-                AsyncImage(url: url) { image in
-                    image
-                        .resizable()
-                        .aspectRatio(contentMode: .fill)
-                } placeholder: {
-                    Rectangle()
-                        .fill(Color.gray.opacity(0.3))
-                }
-            } else {
+        AsyncImage(url: URL(string: video.videoUrl)) { phase in
+            switch phase {
+            case .empty:
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
+                    .overlay(ProgressView())
+            case .success(let image):
+                image
+                    .resizable()
+                    .aspectRatio(contentMode: .fill)
+            case .failure:
                 Rectangle()
                     .fill(Color.gray.opacity(0.3))
                     .overlay(
                         Image(systemName: "play.fill")
                             .foregroundColor(.white)
                     )
+            @unknown default:
+                Rectangle()
+                    .fill(Color.gray.opacity(0.3))
             }
         }
-        .frame(height: 120)
-        .clipped()
     }
 }
 
