@@ -5,6 +5,7 @@ import PhotosUI
 import FirebaseStorage
 import FirebaseFirestore
 import UIKit
+import AVFoundation
 
 struct ProfileView: View {
     @StateObject var authService = AuthService.shared
@@ -320,16 +321,12 @@ struct VideosGridView: View {
 
 struct VideoThumbnail: View {
     let video: Video
+    @State private var thumbnail: UIImage?
     
     var body: some View {
-        AsyncImage(url: URL(string: video.videoUrl)) { phase in
-            switch phase {
-            case .empty:
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
-                    .overlay(ProgressView())
-            case .success(let image):
-                image
+        Group {
+            if let thumbnail = thumbnail {
+                Image(uiImage: thumbnail)
                     .resizable()
                     .aspectRatio(contentMode: .fill)
                     .overlay(
@@ -338,20 +335,44 @@ struct VideoThumbnail: View {
                             .shadow(radius: 2)
                             .font(.title3)
                     )
-            case .failure:
+            } else {
                 Rectangle()
                     .fill(Color.gray.opacity(0.3))
                     .overlay(
-                        Image(systemName: "play.slash.fill")
-                            .foregroundColor(.white)
+                        ProgressView()
+                            .tint(.white)
                     )
-            @unknown default:
-                Rectangle()
-                    .fill(Color.gray.opacity(0.3))
+                    .onAppear {
+                        generateThumbnail()
+                    }
             }
         }
+        .frame(width: UIScreen.main.bounds.width / 3, height: UIScreen.main.bounds.width / 3)
+        .clipped()
         .background(Color.black)
         .cornerRadius(4)
+    }
+    
+    private func generateThumbnail() {
+        guard let videoUrl = URL(string: video.videoUrl) else { return }
+        
+        DispatchQueue.global(qos: .userInitiated).async {
+            let asset = AVAsset(url: videoUrl)
+            let imageGenerator = AVAssetImageGenerator(asset: asset)
+            imageGenerator.appliesPreferredTrackTransform = true
+            
+            // Request thumbnail at 0.0 seconds
+            do {
+                let cgImage = try imageGenerator.copyCGImage(at: .zero, actualTime: nil)
+                let uiImage = UIImage(cgImage: cgImage)
+                
+                DispatchQueue.main.async {
+                    self.thumbnail = uiImage
+                }
+            } catch {
+                print("Error generating thumbnail: \(error)")
+            }
+        }
     }
 }
 
