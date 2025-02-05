@@ -16,33 +16,64 @@ struct ContentView: View {
                 TabView {
                     VideoFeedView()
                         .tabItem {
-                            Image(systemName: "house.fill")
-                            Text("Home")
+                            VStack {
+                                Image(systemName: "house")
+                                    .environment(\.symbolVariants, .none)
+                                Text("Home")
+                                    .font(.caption)
+                            }
                         }
                     
                     Text("Discover")
                         .tabItem {
-                            Image(systemName: "magnifyingglass")
-                            Text("Discover")
+                            VStack {
+                                Image(systemName: "magnifyingglass")
+                                    .environment(\.symbolVariants, .none)
+                                Text("Discover")
+                                    .font(.caption)
+                            }
                         }
                     
                     VideoUploadView()
                         .tabItem {
-                            Image(systemName: "plus.square")
-                            Text("Create")
+                            VStack {
+                                Image(systemName: "plus")
+                                    .environment(\.symbolVariants, .none)
+                                Text("Create")
+                                    .font(.caption)
+                            }
                         }
                     
                     Text("Inbox")
                         .tabItem {
-                            Image(systemName: "message.fill")
-                            Text("Inbox")
+                            VStack {
+                                Image(systemName: "message")
+                                    .environment(\.symbolVariants, .none)
+                                Text("Inbox")
+                                    .font(.caption)
+                            }
                         }
                     
                     ProfileView()
                         .tabItem {
-                            Image(systemName: "person.fill")
-                            Text("Profile")
+                            VStack {
+                                Image(systemName: "person")
+                                    .environment(\.symbolVariants, .none)
+                                Text("Profile")
+                                    .font(.caption)
+                            }
                         }
+                }
+                .tint(.primary) // Use primary color for selected items
+                .onAppear {
+                    // Customize tab bar appearance
+                    let appearance = UITabBarAppearance()
+                    appearance.configureWithDefaultBackground()
+                    appearance.backgroundColor = .systemBackground
+                    
+                    // Use this to ensure the tab bar is opaque
+                    UITabBar.appearance().scrollEdgeAppearance = appearance
+                    UITabBar.appearance().standardAppearance = appearance
                 }
             } else {
                 LoginView()
