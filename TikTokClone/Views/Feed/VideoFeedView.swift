@@ -46,13 +46,35 @@ struct VideoFeedView: View {
                             }
                             
                             // Like Button
-                            let isLiked = videoService.likes[videoService.videos[index].id]?.contains { $0.userId == Auth.auth().currentUser?.uid } ?? false
+                            let videoId = videoService.videos[index].id
+                            let isLiked = videoService.likes[videoId]?.contains { 
+                                $0.userId == Auth.auth().currentUser?.uid 
+                            } ?? false
                             Button(action: {
+                                // Flip local 'isLiked' right away
+                                if isLiked {
+                                    videoService.likes[videoId]?.removeAll { $0.userId == Auth.auth().currentUser?.uid }
+                                } else {
+                                    let uid = Auth.auth().currentUser?.uid ?? "" 
+                                    let likeDocId = "\(uid)_\(videoId)"
+                                    let newLike = Like(id: likeDocId, 
+                                                       userId: uid, 
+                                                       videoId: videoId, 
+                                                       timestamp: Date())
+                                    videoService.likes[videoId, default: []].append(newLike)
+                                }
+                                
+                                // Then do the async call
                                 Task {
-                                    if isLiked {
-                                        try? await videoService.unlikeVideo(videoService.videos[index].id)
-                                    } else {
-                                        try? await videoService.likeVideo(videoService.videos[index].id)
+                                    do {
+                                        if isLiked {
+                                            try await videoService.unlikeVideo(videoId)
+                                        } else {
+                                            try await videoService.likeVideo(videoId)
+                                        }
+                                    } catch {
+                                        // Revert local state or show an error message
+                                        // e.g., remove the local like if it fails
                                     }
                                 }
                             }) {
@@ -61,7 +83,7 @@ struct VideoFeedView: View {
                                         .font(.system(size: 28))
                                         .foregroundColor(isLiked ? .red : .white)
                                     
-                                    Text("\(videoService.likes[videoService.videos[index].id]?.count ?? 0)")
+                                    Text("\(videoService.likes[videoId]?.count ?? 0)")
                                         .font(.caption)
                                         .bold()
                                         .foregroundColor(.white)
@@ -74,13 +96,13 @@ struct VideoFeedView: View {
                                     Image(systemName: "bubble.right.fill")
                                         .font(.system(size: 26))
                                     
-                                    Text("\(videoService.comments[videoService.videos[index].id]?.count ?? 0)")
+                                    Text("\(videoService.comments[videoId]?.count ?? 0)")
                                         .font(.caption)
                                         .bold()
                                 }
                             }
                             .sheet(isPresented: $showComments) {
-                                CommentsView(videoId: videoService.videos[index].id)
+                                CommentsView(videoId: videoId)
                             }
                             
                             // Share Button
@@ -109,7 +131,14 @@ struct VideoFeedView: View {
             .rotationEffect(.degrees(0)) // Ensures proper orientation
             .task {
                 do {
+                    // 1) Fetch the main list of videos
                     try await videoService.fetchVideos()
+                    
+                    // 2) For each newly fetched video, attach snapshot listeners
+                    for video in videoService.videos {
+                        videoService.listenForLikes(for: video.id)
+                        videoService.listenForComments(for: video.id)
+                    }
                 } catch {
                     print("Error fetching videos: \(error)")
                 }
